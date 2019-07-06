@@ -1,4 +1,8 @@
-"""Watchdog App for AppDaemon."""
+"""
+Watchdog App for AppDaemon.
+
+https://github.com/ludeeus/ad-watchdog
+"""
 import appdaemon.plugins.hass.hassapi as hass
 
 
@@ -131,7 +135,8 @@ class Watchdog(hass.Hass):
                     return False
 
         for watchdog in config["watchdogs"]:
-            self.watchdog_config[watchdog["name"]] = {}
+            name = watchdog["name"].lower().replace(" ", "_")
+            self.watchdog_config[name] = {}
             for entity in watchdog["entities"]:
                 state = entity.get("state")
                 if state is True:
@@ -140,8 +145,8 @@ class Watchdog(hass.Hass):
                     state = "off"
                 elif state is None:
                     state = "off"
-                self.watchdog_config[watchdog["name"]][entity["entity"]] = {}
-                self.watchdog_config[watchdog["name"]][entity["entity"]]["above"] = entity.get("above")
-                self.watchdog_config[watchdog["name"]][entity["entity"]]["below"] = entity.get("below")
-                self.watchdog_config[watchdog["name"]][entity["entity"]]["state"] = state
+                self.watchdog_config[name][entity["entity"]] = {}
+                self.watchdog_config[name][entity["entity"]]["above"] = entity.get("above")
+                self.watchdog_config[name][entity["entity"]]["below"] = entity.get("below")
+                self.watchdog_config[name][entity["entity"]]["state"] = state
         return True
