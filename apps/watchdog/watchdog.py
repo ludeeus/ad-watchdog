@@ -95,6 +95,9 @@ class Watchdog(hass.Hass):
             watchdog_state = self.get_state("watchdog.{}".format(watchdog), attribute="all")
         watchdog_attributes = watchdog_state.get("attributes", {})
         watchdog_entities = watchdog_attributes.get("entities", [])
+        
+        if not isinstance(watchdog_entities, list):
+            watchdog_entities = []
 
         if add_or_remove == "add":
             if entity not in watchdog_entities:
@@ -156,6 +159,7 @@ class Watchdog(hass.Hass):
                     state = "off"
                 elif state is None:
                     state = "off"
+                self.watchdog_config[name]["entities"]
                 self.watchdog_config[name]["entities"][entity["entity"]] = {}
                 self.watchdog_config[name]["entities"][entity["entity"]]["above"] = entity.get("above")
                 self.watchdog_config[name]["entities"][entity["entity"]]["below"] = entity.get("below")
