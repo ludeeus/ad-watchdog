@@ -10,63 +10,98 @@ class Watchdog(hass.Hass):
         configuration = self.validate_config(self.args)
         if not configuration:
             return
-        watchdogs = self.args['watchdogs']
-        for watchdog in watchdogs:
-            self.log("Configuring {} watchdog".format(watchdog["name"]))
-            for entity in watchdog["entities"]:
+
+        for watchdog in self.watchdog_config:
+            watchdog_name = watchdog
+            watchdog_config = self.watchdog_config[watchdog]
+
+            self.log("Configuring {} watchdog".format(watchdog_name))
+
+            for entity in watchdog_config:
+                self.log("Configuring {} watchdog for {}".format(watchdog_name, entity))
+
                 entity_state = self.get_state(entity, attribute="all")
+
                 if entity_state is None:
                     self.log("{} does not exsist :(".format(entity))
                     continue
-                attributes = entity_state.get("attributes", {})
-                if not attributes.get("watchdogs"):
-                    attributes["watchdogs"] = [watchdog["name"]]
-                else:
-                    if isinstance(attributes["watchdogs"], list):
-                        if watchdog["name"] not in attributes["watchdogs"]:
-                            attributes["watchdogs"].append(watchdog["name"])
-                    else:
-                        attributes["watchdogs"] = [attributes["watchdogs"]]
-                self.set_state(entity, attributes=attributes)
-                self.listen_state(self.update_watchdog, entity)
-                self.update_watchdog(entity, None, None, entity_state.get("state"), None)
 
+                self.listen_state(self.trigger, entity)
+                self.trigger(entity, None, None, entity_state.get("state"), None)
 
-    def update_watchdog(self, entity, attribute, old, new, kwargs):
-        """Update the watchdog info."""
+    def trigger(self, entity, attribute, old, new, kwargs):
+        """Trigger from entity state."""
         entity_state = self.get_state(entity, attribute="all")
-        attributes = entity_state.get("attributes", {})
-        self.log(attributes)
-        if new == "on":
-            for watchdog in attributes.get("watchdogs", []):
-                watchdog_state = self.get_state("watchdog.{}".format(watchdog), attribute="all")
-                watchdog_attributes = watchdog_state.get("attributes", {})
-                entities = watchdog_attributes.get("entities", [])
-                if entity in entities:
-                    entities.remove(entity)
-                if entities:
-                    self.set_state("watchdog.{}".format(watchdog),
-                                   state=self.state_offline,
-                                   attributes={"entities": entities})
-                else:
-                    self.set_state("watchdog.{}".format(watchdog),
-                                   state=self.state_normal,
-                                   attributes={"entities": []})
-        elif new == "off":
-            for watchdog in attributes.get("watchdogs", []):
-                watchdog_state = self.get_state("watchdog.{}".format(watchdog), attribute="all")
-                watchdog_attributes = watchdog_state.get("attributes", {})
-                entities = watchdog_attributes.get("entities", [])
-                if entity not in entities:
-                    entities.append(entity)
-                self.set_state("watchdog.{}".format(watchdog),
-                               state=self.state_offline,
-                               attributes={"entities": entities})
+        entity_attributes = entity_state.get("attributes", {})
+
+        entity_watchdogs = []
+
+        for watchdog in self.watchdog_config:
+            if entity in self.watchdog_config[watchdog]:
+                entity_watchdogs.append(watchdog)
+
+        entity_attributes["watchdogs"] = entity_watchdogs
+        self.set_state(entity, attributes=entity_attributes)
+
+        for watchdog in entity_watchdogs:
+            triggers = self.watchdog_config[watchdog][entity]
+
+            try:
+                new = int(new)
+            except Exception:
+                pass
+
+            if triggers["above"] is not None:
+                if isinstance(new, (float, int)):
+                    if new > triggers["above"]:
+                        self.log("{} is above {} for {}".format(new, triggers["above"], entity))
+                        self.update_watchdog(watchdog, entity, "add")
+                        continue
+
+            if triggers["below"] is not None:
+                if isinstance(new, (float, int)):
+                    if new < triggers["below"]:
+                        self.log("{} is below {} for {}".format(new, triggers["below"], entity))
+                        self.update_watchdog(watchdog, entity, "add")
+                        continue
+
+            if new is None and triggers["state"].lower() == "unknown":
+                self.update_watchdog(watchdog, entity, "add")
+                continue
+
+            elif isinstance(new, str) and triggers["state"].lower() == new.lower():
+                self.update_watchdog(watchdog, entity, "add")
+                continue
+
+            self.update_watchdog(watchdog, entity, "remove")
+
+    def update_watchdog(self, watchdog, entity, add_or_remove):
+        """Update watchdog info."""
+        watchdog_state = self.get_state("watchdog.{}".format(watchdog), attribute="all")
+        watchdog_attributes = watchdog_state.get("attributes", {})
+        watchdog_entities = watchdog_attributes.get("entities", [])
+
+        if add_or_remove == "add":
+            if entity not in watchdog_entities:
+                watchdog_entities.append(entity)
+        elif add_or_remove == "remove":
+            if entity in watchdog_entities:
+                watchdog_entities.remove(entity)
+
+        if watchdog_entities:
+            self.set_state("watchdog.{}".format(watchdog),
+                           state=self.state_offline,
+                           attributes={"entities": watchdog_entities})
+        else:
+            self.set_state("watchdog.{}".format(watchdog),
+                           state=self.state_normal,
+                           attributes={"entities": []})
 
     def validate_config(self, config):
         """Validate the configuration."""
         self.state_normal = config.get("state_normal", "All good")
         self.state_offline = config.get("state_offline", "Something is wrong!")
+        self.watchdog_config = {}
 
         if not isinstance(config["watchdogs"], list):
             self.log("Config option 'watchdogs' is not a list!")
@@ -85,7 +120,23 @@ class Watchdog(hass.Hass):
                 self.log("Config option 'watchdogs[][entities]' is not a list!")
                 return False
 
-            if not watchdog.get("entities"):
-                self.log("Required config option 'watchdogs[][entities]' is missing!")
-                return False
+            for entity in watchdog["entities"]:
+                if not isinstance(entity, dict):
+                    self.log("Config option 'watchdogs[entities][]' is not a dictionary!")
+                    return False
+
+        for watchdog in config["watchdogs"]:
+            self.watchdog_config[watchdog["name"]] = {}
+            for entity in watchdog["entities"]:
+                state = entity.get("state")
+                if state is True:
+                    state = "on"
+                elif state is False:
+                    state = "off"
+                elif state is None:
+                    state = "off"
+                self.watchdog_config[watchdog["name"]][entity["entity"]] = {}
+                self.watchdog_config[watchdog["name"]][entity["entity"]]["above"] = entity.get("above")
+                self.watchdog_config[watchdog["name"]][entity["entity"]]["below"] = entity.get("below")
+                self.watchdog_config[watchdog["name"]][entity["entity"]]["state"] = state
         return True

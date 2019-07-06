@@ -1,3 +1,4 @@
+
 ## Example App configuration
 
 ```yaml
@@ -9,14 +10,20 @@ watchdog:
   watchdogs:
     - name: bedroom
       entities:
-        - binary_sensor.heat_bedroom
-        - binary_sensor.heat_bedroom1
-        - binary_sensor.heat_bedroom2
+        - entity: sensor.battery
+          below: 30
+        - entity: binary_sensor.heat_bedroom
+        - entity: sensor.battery2
+          above: 80
     - name: livingroom
       entities:
-        - binary_sensor.heat_livingroom
-        - binary_sensor.heat_livingroom1
-        - binary_sensor.heat_livingroom2
+        - entity: sensor.battery
+          state: unknown
+          below: 30
+        - entity: binary_sensor.heat_bedroom
+          state: off
+        - entity: sensor.battery2
+          above: 80
 ```
 
 key | optional | type | default | description
@@ -27,4 +34,8 @@ key | optional | type | default | description
 `state_offline` | True | string | Something is wrong! | The state that will be used for the watchdog entity when one or more watched entity are offline.
 `watchdogs` | False | list | | A list of watchdogs.
 `watchdogs[name]` | False | string | | The name of the watchdog.
-`watchdogs[entities]` | False | string | | A list of entity_id's for the watchdog to monitor.
+`watchdogs[entities]` | False | string | | A list of entites for the watchdog to monitor.
+`watchdogs[entities][entity]` | False | string | | The entity ID of an entity to monitor.
+`watchdogs[entities][above]` | True | string | off | A state to match for the trigger
+`watchdogs[entities][below]` | True | int | | A int to match for the trigger
+`watchdogs[entities][state]` | True | int | | A int to match for the trigger
