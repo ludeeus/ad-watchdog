@@ -34,6 +34,7 @@ key | optional | type | default | description
 `state_offline` | True | string | Something is wrong! | The state that will be used for the watchdog entity when one or more watched entity are offline.
 `watchdogs` | False | list | | A list of watchdogs.
 `watchdogs[name]` | False | string | | The name of the watchdog.
+`watchdogs[icon]` | True | string | "mdi:eye" | The name of the watchdog.
 `watchdogs[entities]` | False | string | | A list of entites for the watchdog to monitor.
 `watchdogs[entities][entity]` | False | string | | The entity ID of an entity to monitor.
 `watchdogs[entities][above]` | True | string | off | A state to match for the trigger

@@ -21,7 +21,7 @@ class Watchdog(hass.Hass):
 
             self.log("Configuring {} watchdog".format(watchdog_name))
 
-            for entity in watchdog_config:
+            for entity in watchdog_config["entities"]:
                 self.log("Configuring {} watchdog for {}".format(watchdog_name, entity))
 
                 entity_state = self.get_state(entity, attribute="all")
@@ -41,14 +41,14 @@ class Watchdog(hass.Hass):
         entity_watchdogs = []
 
         for watchdog in self.watchdog_config:
-            if entity in self.watchdog_config[watchdog]:
+            if entity in self.watchdog_config[watchdog]["entities"]:
                 entity_watchdogs.append(watchdog)
 
         entity_attributes["watchdogs"] = entity_watchdogs
         self.set_state(entity, attributes=entity_attributes)
 
         for watchdog in entity_watchdogs:
-            triggers = self.watchdog_config[watchdog][entity]
+            triggers = self.watchdog_config[watchdog]["entities"][entity]
 
             try:
                 new = int(new)
@@ -81,11 +81,17 @@ class Watchdog(hass.Hass):
 
     def update_watchdog(self, watchdog, entity, add_or_remove):
         """Update watchdog info."""
+        attributes = {
+            "icon": self.watchdog_config[watchdog]["icon"],
+            "friendly_name": self.watchdog_config[watchdog]["friendly_name"],
+        
+        }
+
         watchdog_state = self.get_state("watchdog.{}".format(watchdog), attribute="all")
         if watchdog_state  is None:
             self.set_state("watchdog.{}".format(watchdog),
                            state=self.state_normal,
-                           attributes={"entities": []})
+                           attributes={"entities": attributes})
             watchdog_state = self.get_state("watchdog.{}".format(watchdog), attribute="all")
         watchdog_attributes = watchdog_state.get("attributes", {})
         watchdog_entities = watchdog_attributes.get("entities", [])
@@ -98,13 +104,15 @@ class Watchdog(hass.Hass):
                 watchdog_entities.remove(entity)
 
         if watchdog_entities:
+            attributes["entities"] = watchdog_entities
             self.set_state("watchdog.{}".format(watchdog),
                            state=self.state_offline,
-                           attributes={"entities": watchdog_entities})
+                           attributes=attributes)
         else:
+            attributes["entities"] = []
             self.set_state("watchdog.{}".format(watchdog),
                            state=self.state_normal,
-                           attributes={"entities": []})
+                           attributes=attributes)
 
     def validate_config(self, config):
         """Validate the configuration."""
@@ -137,6 +145,9 @@ class Watchdog(hass.Hass):
         for watchdog in config["watchdogs"]:
             name = watchdog["name"].lower().replace(" ", "_")
             self.watchdog_config[name] = {}
+            self.watchdog_config[name]["icon"] = watchdog.get("icon", "mdi:eye")
+            self.watchdog_config[name]["friendly_name"] = watchdog["name"]
+            self.watchdog_config[name]["entities"] = {}
             for entity in watchdog["entities"]:
                 state = entity.get("state")
                 if state is True:
@@ -145,8 +156,8 @@ class Watchdog(hass.Hass):
                     state = "off"
                 elif state is None:
                     state = "off"
-                self.watchdog_config[name][entity["entity"]] = {}
-                self.watchdog_config[name][entity["entity"]]["above"] = entity.get("above")
-                self.watchdog_config[name][entity["entity"]]["below"] = entity.get("below")
-                self.watchdog_config[name][entity["entity"]]["state"] = state
+                self.watchdog_config[name]["entities"][entity["entity"]] = {}
+                self.watchdog_config[name]["entities"][entity["entity"]]["above"] = entity.get("above")
+                self.watchdog_config[name]["entities"][entity["entity"]]["below"] = entity.get("below")
+                self.watchdog_config[name]["entities"][entity["entity"]]["state"] = state
         return True
