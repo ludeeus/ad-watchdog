@@ -78,6 +78,11 @@ class Watchdog(hass.Hass):
     def update_watchdog(self, watchdog, entity, add_or_remove):
         """Update watchdog info."""
         watchdog_state = self.get_state("watchdog.{}".format(watchdog), attribute="all")
+        if watchdog_state  is None:
+            self.set_state("watchdog.{}".format(watchdog),
+                           state=self.state_normal,
+                           attributes={"entities": []})
+            watchdog_state = self.get_state("watchdog.{}".format(watchdog), attribute="all")
         watchdog_attributes = watchdog_state.get("attributes", {})
         watchdog_entities = watchdog_attributes.get("entities", [])
 
