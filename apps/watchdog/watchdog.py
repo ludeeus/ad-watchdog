@@ -52,7 +52,7 @@ class Watchdog(hass.Hass):
                     self.set_state("watchdog.{}".format(watchdog),
                                    state=self.state_normal,
                                    attributes={"entities": []})
-        elif new == "off"::
+        elif new == "off":
             for watchdog in attributes.get("watchdogs", []):
                 watchdog_state = self.get_state("watchdog.{}".format(watchdog), attribute="all")
                 watchdog_attributes = watchdog_state.get("attributes", {})
