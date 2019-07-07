@@ -108,14 +108,25 @@ class Watchdog(hass.Hass):
 
         if watchdog_entities:
             attributes["entities"] = watchdog_entities
+            attributes["friendly_names"] = self.get_friendly_names(watchdog_entities)
             self.set_state("watchdog.{}".format(watchdog),
                            state=self.state_offline,
                            attributes=attributes)
         else:
             attributes["entities"] = []
+            attributes["friendly_names"] = []
             self.set_state("watchdog.{}".format(watchdog),
                            state=self.state_normal,
                            attributes=attributes)
+
+    def get_friendly_names(self, entities):
+        """Return a list of friendly names."""
+        friendly = []
+        for entity in entities:
+            entity_state = self.get_state(entity, attribute="all")
+            entity_attributes = entity_state.get("attributes", {})
+            friendly.append(entity_attributes.get("friendly_name", entity))
+        return friendly
 
     def validate_config(self, config):
         """Validate the configuration."""
